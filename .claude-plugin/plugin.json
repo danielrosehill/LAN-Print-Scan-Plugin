@@ -1,0 +1,12 @@
+{
+  "name": "network-cups",
+  "version": "1.0.0",
+  "description": "Discover, diagnose, and print to networked CUPS printers from Claude Code. Wraps the lan-mcp-cups MCP server and adds LAN discovery (avahi/Bonjour, arp-scan) plus ufw firewall sanity checks.",
+  "author": {
+    "name": "Daniel Rosehill",
+    "url": "https://github.com/danielrosehill"
+  },
+  "repository": "https://github.com/danielrosehill/Claude-Network-CUPS-Plugin",
+  "license": "MIT",
+  "keywords": ["cups", "printing", "homelab", "mcp", "network-discovery"]
+}

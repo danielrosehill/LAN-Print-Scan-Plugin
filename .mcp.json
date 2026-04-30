@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "network-cups": {
+      "command": "npx",
+      "args": ["-y", "lan-mcp-cups"],
+      "env": {
+        "MCP_CUPS_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
