@@ -22,23 +22,23 @@ Run a comprehensive diagnostic sequence to isolate printing issues. Stop at the 
 
 Execute the following checks in sequence. Stop immediately on failure and show the remediation.
 
-**1. Check MCP_CUPS_SERVER env var.**
+**1. Check CUPS_SERVER env var.**
 ```
-Read MCP_CUPS_SERVER from environment.
-If unset, read from ${CLAUDE_USER_DATA}/network-cups/config.json -> cups_server.
-If still unset, emit: "CUPS server not configured. Run onboard skill."
+Read CUPS_SERVER from environment.
+If unset, read `site.md` in the data dir (see README).
+If still unset, emit: "CUPS server not configured. Run the onboard skill."
 Stop.
 ```
 
 **2. Test TCP reachability to CUPS port 631.**
 ```bash
-nc -zv -w 2 $MCP_CUPS_SERVER 631
+nc -zv -w 2 $CUPS_SERVER 631
 ```
 If timeout/refused:
 ```
-FAIL: Cannot reach CUPS server at $MCP_CUPS_SERVER:631.
+FAIL: Cannot reach CUPS server at $CUPS_SERVER:631.
 Remediation:
-  - Verify CUPS is running on the server: ssh <user>@$MCP_CUPS_SERVER systemctl status cups
+  - Verify CUPS is running on the server: ssh <user>@$CUPS_SERVER systemctl status cups
   - Check firewall on the server: sudo ufw allow 631/tcp 631/udp
   - Verify hostname/IP is correct.
   - Run check-cups-firewall for local firewall audit.
@@ -78,12 +78,12 @@ Emit one-line summary: "Firewall: PASS (631/tcp, 631/udp allowed)" or "Firewall:
 If FAIL, show remediation commands inline.
 ```
 
-**6. Query MCP list_printers.**
+**6. List the server's queues.**
 ```
-Call MCP tool list_printers via network-cups server.
-If ≥1 printer returned, report: "PASS: <N> printer(s) registered on CUPS server."
-If 0 printers, report: "WARN: No printers registered on CUPS server yet. Use add-printer or discover-printers-* to register one."
-If MCP error (auth, connection), report: "FAIL: MCP connection failed: <error>. Check MCP_CUPS_SERVER and env vars."
+Run: lpstat -h $CUPS_SERVER:631 -v
+If ≥1 queue returned, report: "PASS: <N> queue(s) on the CUPS server."
+If none, report: "WARN: No queues on the CUPS server yet. Use the onboard skill to add one."
+If "Forbidden", report: "FAIL: CUPS is refusing this client. See the server setup in skill server-routes."
 ```
 
 ## Output / side effects
@@ -92,7 +92,7 @@ Emit a checklist like:
 ```
 Network Printing Diagnostic (2026-04-30)
 
-[PASS] MCP_CUPS_SERVER set to: cups.lan
+[PASS] CUPS_SERVER set to: cups.lan
 [PASS] TCP 631 reachable (CUPS running)
 [WARN] avahi-daemon inactive (Bonjour unavailable) — run: sudo systemctl start avahi-daemon
 [PASS] Firewall: 631/tcp, 631/udp allowed
@@ -105,7 +105,7 @@ Or (on first failure):
 ```
 Network Printing Diagnostic (2026-04-30)
 
-[PASS] MCP_CUPS_SERVER set to: cups.lan
+[PASS] CUPS_SERVER set to: cups.lan
 [FAIL] TCP 631 unreachable
        Remediation:
        - Verify CUPS running on cups.lan: ssh user@cups.lan systemctl status cups

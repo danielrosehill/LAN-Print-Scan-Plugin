@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""escl-scan: scan from an eSCL printer with no SANE install, so it runs on the server.
+
+Usage: escl-scan --host PRINTER [--format pdf|jpeg] [--resolution 300]
+                 [--mode color|gray] [--outdir ~/printing/scans] [--status]
+Prints JSON. This is the relay route: run it on a server that can reach the printer when
+the caller can't. Flatbed only, A4. --host can also come from $ESCL_HOST.
+"""
+import argparse
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+BODY = """<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+<pwg:Version>2.0</pwg:Version><scan:Intent>Document</scan:Intent>
+<pwg:ScanRegions><pwg:ScanRegion><pwg:Height>3507</pwg:Height><pwg:Width>2480</pwg:Width>
+<pwg:XOffset>0</pwg:XOffset><pwg:YOffset>0</pwg:YOffset>
+<pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits></pwg:ScanRegion></pwg:ScanRegions>
+<pwg:InputSource>Platen</pwg:InputSource><pwg:DocumentFormat>{fmt}</pwg:DocumentFormat>
+<scan:ColorMode>{mode}</scan:ColorMode><scan:XResolution>{res}</scan:XResolution><scan:YResolution>{res}</scan:YResolution>
+</scan:ScanSettings>"""
+
+
+def state(base):
+    text = urllib.request.urlopen(base + "/ScannerStatus", timeout=10).read().decode()
+    m = re.search(r"<pwg:State>([^<]+)", text)
+    return m.group(1) if m else "unknown"
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--host", default=os.environ.get("ESCL_HOST"))
+    p.add_argument("--format", choices=["pdf", "jpeg"], default="pdf")
+    p.add_argument("--resolution", type=int, default=300)
+    p.add_argument("--mode", choices=["color", "gray"], default="color")
+    p.add_argument("--outdir", default="~/printing/scans")
+    p.add_argument("--status", action="store_true")
+    a = p.parse_args()
+    if not a.host:
+        sys.exit(json.dumps({"error": "give --host or set ESCL_HOST"}))
+    base = f"http://{a.host}:8080/eSCL"
+    now = state(base)
+    if a.status or now != "Idle":
+        print(json.dumps({"state": now}))
+        sys.exit(0 if a.status else 1)
+    fmt = "application/pdf" if a.format == "pdf" else "image/jpeg"
+    body = BODY.format(fmt=fmt, res=a.resolution, mode="RGB24" if a.mode == "color" else "Grayscale8")
+    req = urllib.request.Request(base + "/ScanJobs", data=body.encode(),
+                                 headers={"Content-Type": "text/xml"}, method="POST")
+    job = urllib.request.urlopen(req, timeout=30).headers["Location"]
+    path = job if job.startswith("http") else f"http://{a.host}:8080{job}"
+    data = None
+    for _ in range(60):  # the page isn't ready the moment the job is created
+        try:
+            data = urllib.request.urlopen(path.rstrip("/") + "/NextDocument", timeout=120).read()
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 503:
+                raise
+            time.sleep(2)
+    if not data:
+        sys.exit(json.dumps({"error": "scanner returned no document"}))
+    out = Path(a.outdir).expanduser()
+    out.mkdir(parents=True, exist_ok=True)
+    name = out / f"scan-{datetime.now():%Y%m%d-%H%M%S}.{'pdf' if a.format == 'pdf' else 'jpg'}"
+    name.write_bytes(data)
+    print(json.dumps({"file": str(name), "bytes": len(data)}))
+
+
+if __name__ == "__main__":
+    main()
