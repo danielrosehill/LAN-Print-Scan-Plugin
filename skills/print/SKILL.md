@@ -51,6 +51,23 @@ For anything over a few pages, or anything generated, show the page count and as
 before printing. Printing uses paper and can't be undone. One page, or the user
 said "print it", means go ahead.
 
+## PDF stops with "gstoraster filter failed"
+
+If a PDF job stays in the queue, or the server logs `cfFilterGhostscript: Unexpected page count` / `gstoraster filter failed`
+(the debug lines say `Missing Root object` or `Unable to find start of cross-reference table`), the server's `pdftopdf` filter
+is mangling the PDF, not the file itself (seen 2026-11-13 on a snap CUPS 2.4 print server, with Chrome and cairo PDFs alike;
+the spool copy was intact). Re-printing the PDF, or re-flattening it with `pdftocairo`, does not help. Cancel the stuck job
+and send PostScript instead, which skips `pdftopdf`:
+
+```bash
+cancel <job-id>
+pdftops -level3 -paper A4 in.pdf in.ps        # -paper Letter for US paper
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" print in.ps -p <queue>   # or: lp -d <queue> -o media=A4 in.ps
+```
+
+For a landscape page do not add `-o landscape`: the page is already landscape, and the option rotates it a second time.
+Confirm it printed from the server's `page_log` (`total 1`, not `total 0`), not from the client queue emptying.
+
 ## After
 
 The result carries `jobs` (CUPS request ids). If the user wants confirmation it came
