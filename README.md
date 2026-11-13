@@ -57,9 +57,11 @@ printctl.py registry list|show|add|remove|set [--id --name --description --site 
 printctl.py install <id> [--default] [--queue NAME] [--uri ipps|ipp|dnssd] [--dry-run]
 printctl.py queues
 printctl.py remove-queue <queue>
-printctl.py print FILE… [-p id|queue] [-n N] [--sides one|long|short] [--mono] [--pages R] [--media M] [--quality draft|normal|high] [--fit] [-o raw] [--dry-run]
+printctl.py print FILE… [-p id|queue] [-n N] [--sides one|long|short] [--mono] [--pages R] [--media M] [--quality draft|normal|high] [--fit] [-o raw] [--ps] [--dry-run]
 printctl.py status <id | queue | uri>
 printctl.py cancel <job…> | --all -p <printer>
+printctl.py jobs [-p queue] [--completed]          # this machine and the upstream print server
+printctl.py clean-jobs [-p queue] [--stale MIN | --all] [--dry-run]
 printctl.py topdf FILE [-o out.pdf] [--paper a4|us-letter]
 printctl.py render TEMPLATE --var K=V … [--body-file F] [--outdir D] | render --list
 printctl.py scan [-p id] [--format pdf|png|jpeg|tiff] [--resolution N] [--mode Color|Gray] [--source Flatbed|ADF] [--area a4|letter|WxH] [-o FILE]
