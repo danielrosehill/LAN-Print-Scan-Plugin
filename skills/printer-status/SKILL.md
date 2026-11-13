@@ -47,3 +47,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" cancel --all -p <id-or-queue
 ```
 
 Cancelling your own job is fine. Confirm before `--all`.
+
+`cancel` only reaches this machine's queue. When the queue forwards to a print server, a failed job can sit "stopped" on
+the server after the local queue has emptied ("why nothing came out"). See both, then clear stuck ones on both sides:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" jobs -p <queue>          # local + server jobs, and the server printer's message
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" clean-jobs -p <queue>    # cancel pending jobs older than 5 min (--stale, --all, --dry-run)
+```
+
+A server message of `filter failed` on a PDF means re-send with `print --ps` (skill `print`).

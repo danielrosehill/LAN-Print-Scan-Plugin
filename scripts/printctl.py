@@ -484,6 +484,19 @@ def cmd_print(args) -> None:
         cmd += ["-t", args.title]
     for o in args.option or []:
         cmd += ["-o", o]
+    if args.ps:  # PDFs go as PostScript, past a print server whose pdftopdf mangles them (skill print)
+        tmp = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "lan-print-scan"
+        tmp.mkdir(parents=True, exist_ok=True)
+        conv = []
+        for f in files:
+            if f.suffix.lower() == ".pdf":
+                ps = tmp / (f.stem + ".ps")
+                if not args.dry_run:
+                    run(["pdftops", "-level3", "-paper", "match", str(f), str(ps)], timeout=120, check=True)
+                conv.append(ps)
+            else:
+                conv.append(f)
+        files = conv
     cmd += [str(f) for f in files]
     if args.dry_run:
         out({"ok": True, "dry_run": True, "queue": queue, "command": " ".join(_shq(c) for c in cmd)})
@@ -520,6 +533,77 @@ def cmd_cancel(args) -> None:
     cmd = ["cancel", "-a", resolve_queue(args.printer)] if args.all else ["cancel", *args.job]
     run(cmd, timeout=20, check=True)
     out({"ok": True, "cancelled": args.job or "all"})
+
+
+# ---------------------------------------------------------------- jobs (2026-11-13)
+# A client queue that points at a CUPS print server (ipp://host:631/printers/NAME) has two job lists: this machine's, and the
+# server's, where a job that fails in a filter sits "stopped" while the client queue looks fine or keeps "printing". `jobs`
+# shows both plus the server's printer message; `clean-jobs` cancels stale ones on both. Remote cancel works for the job's
+# own user from an allowed network (no /admin needed).
+
+def upstream(queue: str) -> tuple[str, str] | None:
+    """(host:port, server queue) when this queue forwards to another CUPS server, else None."""
+    m = re.search(r"device for \S+: (ipps?)://([^/]+)/printers/([^/?\s]+)", run(["lpstat", "-v", queue], timeout=10).stdout)
+    if not m:
+        return None
+    host = m.group(2) if ":" in m.group(2) else f"{m.group(2)}:631"
+    return host, m.group(3)
+
+
+def _jobs(queue: str, host: str | None = None, which: str = "not-completed") -> list[dict]:
+    cmd = ["lpstat"] + (["-h", host] if host else []) + ["-W", which, "-o", queue]
+    rows = []
+    for line in run(cmd, timeout=15).stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 8 or not parts[0].startswith(queue + "-"):
+            continue
+        when = None
+        for fmt in ("%a %b %d %H:%M:%S %Y", "%a %d %b %Y %H:%M:%S"):  # C locale, then a day-first locale
+            try:
+                when = dt.datetime.strptime(" ".join(parts[3:8]), fmt)
+                break
+            except ValueError:
+                pass
+        rows.append({"id": parts[0], "user": parts[1], "bytes": int(parts[2]) if parts[2].isdigit() else None,
+                     "submitted": when.isoformat() if when else " ".join(parts[3:]),
+                     "age_min": round((dt.datetime.now() - when).total_seconds() / 60, 1) if when else None})
+    return rows
+
+
+def _printer_message(queue: str, host: str | None = None) -> str:
+    lines = run(["lpstat"] + (["-h", host] if host else []) + ["-l", "-p", queue], timeout=15).stdout.splitlines()
+    return " | ".join(l.strip() for l in lines[:2] if l.strip())
+
+
+def cmd_jobs(args) -> None:
+    queue = resolve_queue(args.printer)
+    which = "completed" if args.completed else "not-completed"
+    result = {"ok": True, "queue": queue, "local": _jobs(queue, which=which), "local_printer": _printer_message(queue)}
+    up = upstream(queue)
+    if up:
+        result["server"] = {"host": up[0], "queue": up[1], "jobs": _jobs(up[1], up[0], which), "printer": _printer_message(up[1], up[0])}
+    if "filter failed" in json.dumps(result):
+        result["hint"] = ("A filter failed on the print server. For a PDF, send PostScript instead: print --ps "
+                          "(skill print, 'PDF stops with gstoraster filter failed').")
+    out(result)
+
+
+def cmd_clean_jobs(args) -> None:
+    queue = resolve_queue(args.printer)
+    stale = lambda j: args.all or (j["age_min"] is not None and j["age_min"] >= args.stale)
+    plan = [{"where": "local", "id": j["id"], "age_min": j["age_min"]} for j in _jobs(queue) if stale(j)]
+    up = upstream(queue)
+    if up:
+        plan += [{"where": up[0], "id": j["id"], "age_min": j["age_min"]} for j in _jobs(up[1], up[0]) if stale(j)]
+    if args.dry_run:
+        out({"ok": True, "dry_run": True, "queue": queue, "would_cancel": plan})
+        return
+    done = []
+    for j in plan:
+        r = run(["cancel"] + ([] if j["where"] == "local" else ["-h", j["where"]]) + [j["id"]], timeout=20)
+        done.append({**j, "ok": r.returncode == 0, "error": r.stderr.strip() or None})
+    out({"ok": all(d["ok"] for d in done), "queue": queue, "cancelled": done,
+         "left": {"local": _jobs(queue), **({"server": _jobs(up[1], up[0])} if up else {})}})
 
 
 # ---------------------------------------------------------------- documents
@@ -696,8 +780,21 @@ def main() -> None:
     s.add_argument("--fit", action="store_true")
     s.add_argument("--title")
     s.add_argument("-o", "--option", action="append", help="raw lp -o option")
+    s.add_argument("--ps", action="store_true", help="send PDFs as PostScript (pdftops), for a server that fails PDFs")
     s.add_argument("--dry-run", action="store_true")
     s.set_defaults(fn=cmd_print)
+
+    s = sub.add_parser("jobs", help="jobs on this queue and, for a client queue, on the print server, with the printer message")
+    s.add_argument("-p", "--printer")
+    s.add_argument("--completed", action="store_true", help="completed jobs instead of pending ones")
+    s.set_defaults(fn=cmd_jobs)
+
+    s = sub.add_parser("clean-jobs", help="cancel stale or stuck jobs here and on the print server")
+    s.add_argument("-p", "--printer")
+    s.add_argument("--stale", type=float, default=5, help="minutes a pending job may wait before it counts as stuck (default 5)")
+    s.add_argument("--all", action="store_true", help="every pending job, whatever its age")
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_clean_jobs)
 
     s = sub.add_parser("status", help="state, ink/toner, media and queued jobs")
     s.add_argument("printer")

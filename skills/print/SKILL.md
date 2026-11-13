@@ -10,7 +10,7 @@ allowed-tools: Bash(python3 *), Bash(pandoc *), Bash(typst *), Bash(soffice *), 
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" print FILE [FILE…] \
   -p <id-or-queue> [-n COPIES] [--sides one|long|short] [--mono] \
   [--pages 1-3,5] [--media A4] [--quality draft|normal|high] [--fit] [--title T] \
-  [-o raw=option] [--dry-run]
+  [-o raw=option] [--ps] [--dry-run]
 ```
 
 `-p` takes a registry id or a CUPS queue name. Leave it out to use the system default.
@@ -60,10 +60,11 @@ the spool copy was intact). Re-printing the PDF, or re-flattening it with `pdfto
 and send PostScript instead, which skips `pdftopdf`:
 
 ```bash
-cancel <job-id>
-pdftops -level3 -paper A4 in.pdf in.ps        # -paper Letter for US paper
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" print in.ps -p <queue>   # or: lp -d <queue> -o media=A4 in.ps
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" clean-jobs -p <queue> --all     # stuck jobs, here and on the server
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" print in.pdf -p <queue> --ps    # pdftops, then lp
 ```
+
+If the site notes say the server has this fault, use `--ps` from the start.
 
 For a landscape page do not add `-o landscape`: the page is already landscape, and the option rotates it a second time.
 Confirm it printed from the server's `page_log` (`total 1`, not `total 0`), not from the client queue emptying.
@@ -73,3 +74,15 @@ Confirm it printed from the server's `page_log` (`total 1`, not `total 0`), not 
 The result carries `jobs` (CUPS request ids). If the user wants confirmation it came
 out, use `printer-status` to check the job left the queue and that the printer isn't
 in `stopped` / `media-empty`.
+
+A client queue that forwards to a print server empties even when the server stops the job. Check both sides:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" jobs -p <queue>               # pending here and on the server, printer message
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" jobs -p <queue> --completed   # the server's finished jobs
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" clean-jobs -p <queue> [--stale MIN | --all] [--dry-run]
+```
+
+`clean-jobs` cancels pending jobs older than `--stale` minutes (default 5), or all of them, on this machine and on the
+server (remote cancel works for the job's own user). It only removes queued jobs, so it needs no confirmation; a page
+already printing is lost, so check `jobs` first when one is mid-print.
