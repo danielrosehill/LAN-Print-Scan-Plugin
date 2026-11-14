@@ -6,6 +6,17 @@ allowed-tools: Bash(python3 *), Bash(pandoc *), Bash(typst *), Bash(soffice *), 
 
 # Print
 
+**If a print hub is configured** (`hub.json` key `print_hub`, or `$PRINT_HUB`; see `site.md`), send documents through it
+so every job lands in one queue with history:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/hubctl.py" print FILE [-p TARGET] [-n COPIES] [--sides one|long|short] \
+  [--mono] [--pages 1-3] [--media A4] [--fit]
+```
+
+It accepts PDF, PostScript, images and plain text (convert anything else to PDF first, as below). Otherwise use the
+local CUPS route:
+
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" print FILE [FILE…] \
   -p <id-or-queue> [-n COPIES] [--sides one|long|short] [--mono] \

@@ -6,6 +6,17 @@ allowed-tools: Bash(python3 *), Bash(scanimage *), Bash(pdfunite *), Bash(mv *)
 
 # Scan
 
+**If a network scanner service is configured** (`hub.json` key `network_scanner`, or `$NETWORK_SCANNER`; see `site.md`),
+use it: the server does the eSCL work and keeps the file.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/hubctl.py" scan [--format pdf|png|jpeg] [--resolution 150|300|600] \
+  [--color color|gray|bw] [--name NAME] -o ~/printing/scans/NAME.pdf --delete
+```
+
+`-o` downloads the scan, `--delete` removes the server copy afterwards (the server prunes after 30 days anyway).
+Without a service, scan directly from this machine:
+
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" scan [-p <id>] \
   [--format pdf|png|jpeg|tiff] [--resolution 300] [--mode Color|Gray] \

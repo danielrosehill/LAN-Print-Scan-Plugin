@@ -82,14 +82,15 @@ Traps found while building this are in [`docs/findings.md`](docs/findings.md).
 
 ## Scope
 
-Label printers (Brother QL/PT, DYMO, Zebra) are detected and flagged `kind: label`. Ones that sit behind an HTTP print
-bridge can be printed to with `scripts/labelctl.py` (skill `print-label`), choosing the printer with `-p/--target`:
+Label printers (Brother QL/PT, DYMO, Zebra) are detected and flagged `kind: label`.
 
-- `niimblue`: a NIIMBOT behind a [niimblue-node](https://github.com/MultiMote/niimblue-node) REST server, rendered by the
-  `niimbot-labels` plugin's `niimlabel.py`.
-- `ptouch-bridge`: a Brother P-touch behind a small `ptouch-print` HTTP bridge (`GET /health`, `POST /print`).
+**Server mode (recommended):** a [LAN Print Hub](https://github.com/danielrosehill/LAN-Print-Hub) on the server is one
+print queue for every printer: documents go to CUPS, labels to NIIMBOT or P-touch bridges, chosen by `target`. A
+[LAN Network Scanner](https://github.com/danielrosehill/LAN-Network-Scanner) does eSCL scans server-side.
+`scripts/hubctl.py` (stdlib) is the client for both: `targets`, `label`, `print`, `jobs`, `scan`, `scans`.
+Point it at them with `hub.json` in the data dir: `{"print_hub": "http://server:9190", "network_scanner": "http://server:9191"}`.
 
-Directly attached QL printers without a bridge are still the job of
+Directly attached QL printers without a hub are the job of
 [`label-printer-plugin`](https://github.com/danielrosehill/label-printer-plugin).
 
 ## Requirements

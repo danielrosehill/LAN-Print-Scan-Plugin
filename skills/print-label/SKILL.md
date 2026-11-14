@@ -1,43 +1,40 @@
 ---
 name: print-label
-description: Print a label on any registered label printer, picking the target by id (e.g. a NIIMBOT B1 for small die-cut button labels, a Brother P-touch for tape labels). Use on "print a label", "label this on the P-touch", "use the niimbot", "which label printers do we have".
-allowed-tools: Bash(uv *)
+description: Print a label on any label printer behind the LAN print hub, choosing the printer by target (e.g. a NIIMBOT for small die-cut button labels, a Brother P-touch for tape). The hub renders text + icon server-side. Use on "print a label", "label this on the P-touch", "use the niimbot", "which label printers do we have".
+allowed-tools: Bash(python3 *)
 ---
 
-# Print a label (routed by target)
+# Print a label through the print hub
 
-One command for every label printer in the registry (`printers.json`, entries with `kind: label`).
+All label printers sit behind one HTTP print queue ([LAN Print Hub](https://github.com/danielrosehill/LAN-Print-Hub)).
+The client is stdlib-only:
 
 ```bash
-L="${CLAUDE_PLUGIN_ROOT}/scripts/labelctl.py"
-uv run -q --script "$L" targets                                # what's registered, and is each bridge up
-uv run -q --script "$L" print -p <id> -t "Line 1\nLine 2" [-i ICON] [-n COPIES] [--dry-run -o /tmp/p.png]
-uv run -q --script "$L" print -p <id> --png FILE               # an existing image
+H="${CLAUDE_PLUGIN_ROOT}/scripts/hubctl.py"
+python3 "$H" targets                                            # printers + live health (kind: label | document)
+python3 "$H" label -p <target> -t "Line 1\nLine 2" [-i ICON] [-n COPIES] --preview /tmp/p.png   # render only
+python3 "$H" label -p <target> -t "Line 1\nLine 2" [-i ICON] [-n COPIES]                        # print, waits for the result
+python3 "$H" label -p <target> --png FILE                       # an existing image
+python3 "$H" jobs -l 10                                         # history
 ```
 
-`-p` / `--target` takes a registry id. Without it, the entry marked `"default": true` is used.
+`-p` takes a target id or alias (`targets` lists both). Without `-p` the hub uses its default label printer.
+Hub URL: `$PRINT_HUB`, else `hub.json` in the plugin data dir (`{"print_hub": "http://host:9190"}`); `site.md` names it.
 
 ## Choosing the target
 
-- Run `targets` first if you don't know what's registered or whether it's up. Each target reports its bridge's own `/health`.
-- **Die-cut small labels** (button caps, switch tags, a 40x30 sticker) → the NIIMBOT-type target.
-- **Continuous tape** (cable flags, shelf edges, long text, anything that should be laminated) → the P-touch-type target. Its length grows with the text; the height is the tape loaded (the bridge reports `tapeMm`/`maxPx`).
-- If the user names a printer ("on the P-touch", "the niimbot"), use that one.
-
-## Drivers
-
-| `driver` | How it prints | Registry fields |
-|---|---|---|
-| `niimblue` | Hands off to the niimbot-labels plugin's `niimlabel.py` (its own rendering, media sizes and `offset_mm` calibration). Extra niimlabel flags go after `--`, e.g. `-- --margin 1 --layout top` | `bridge`, `client` (path to `niimlabel.py`) |
-| `ptouch-bridge` | Renders here (icon left, text right, IBM Plex Sans Bold) and POSTs `{imageDataUrl, copies}` to `<bridge>/print` | `bridge` |
+- **Die-cut labels** (button caps, switch tags, small stickers) → the NIIMBOT-type target (`driver: niimblue`).
+- **Continuous tape** (cable flags, shelf edges, long text) → the P-touch-type target (`driver: ptouch-bridge`). Length grows with the text; height is the loaded tape.
+- A printer the user names wins.
 
 ## Steps
 
-1. `targets` if unsure. 2. `--dry-run -o /tmp/p.png`, then Read the PNG. 3. Same command without `--dry-run`. 4. Report the JSON result.
+1. `--preview /tmp/p.png`, then Read the PNG. Thin outline icons print faintly: prefer filled icons, or drop the icon.
+2. Same command without `--preview`. 3. Report the job `state` (`done` / `failed` + `error`).
 
-Document printing (A4 etc.) is the `print` skill (`printctl.py print -p <id>`), not this one.
+## Options
 
-## Adding a label printer
-
-Add a registry entry by hand (`printctl.py registry` handles document printers): `id`, `name`, `kind: "label"`, `driver`,
-`bridge`, plus `client` for `niimblue`. Schema in `docs/registry.md`.
+`-i` Iconify id (`prefix:name`, bare name = `material-symbols:`). `--opt k=v` passes any hub label field, e.g.
+NIIMBOT `layout=top|left|icon|text`, `margin_mm=1`, `offset_mm=-2`, `media=40x30`, `density=4`, `border=true`;
+any target `invert=true`. Per-printer defaults (media, margin, offset calibration) live in the hub's `targets.yaml`,
+so normally pass none.
