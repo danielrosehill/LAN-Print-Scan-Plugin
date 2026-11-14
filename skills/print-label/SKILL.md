@@ -6,6 +6,11 @@ allowed-tools: Bash(python3 *)
 
 # Print a label through the print hub
 
+**Label design belongs to the `label-printer` plugin** (fonts, Hebrew/RTL, icons, layouts, styles, templates):
+use its skills to design and preview the label. The hub is one transport: use this skill when the chosen
+printer is registered on the hub, or when the user asks for the hub. Prefer `--png FILE` with a label rendered
+by label-printer; the hub's server-side text/icon render (below) is the simple fallback and has no Hebrew/RTL support.
+
 All label printers sit behind one HTTP print queue ([LAN Print Hub](https://github.com/danielrosehill/LAN-Print-Hub)).
 The client is stdlib-only:
 
