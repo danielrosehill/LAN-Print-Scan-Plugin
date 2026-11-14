@@ -1,6 +1,6 @@
 {
   "name": "lan-print-scan",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Print and scan on a local network from an AI agent: discover printers, keep a registry, add driverless CUPS queues, print with options, typeset printouts from Typst templates, scan over eSCL, check ink and jobs, and share it all from one server.",
   "author": {
     "name": "Daniel Rosehill",

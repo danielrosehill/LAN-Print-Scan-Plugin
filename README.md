@@ -82,7 +82,14 @@ Traps found while building this are in [`docs/findings.md`](docs/findings.md).
 
 ## Scope
 
-Label printers (Brother QL/PT, DYMO, Zebra) are detected and flagged `kind: label`, but printing to them is the job of
+Label printers (Brother QL/PT, DYMO, Zebra) are detected and flagged `kind: label`. Ones that sit behind an HTTP print
+bridge can be printed to with `scripts/labelctl.py` (skill `print-label`), choosing the printer with `-p/--target`:
+
+- `niimblue`: a NIIMBOT behind a [niimblue-node](https://github.com/MultiMote/niimblue-node) REST server, rendered by the
+  `niimbot-labels` plugin's `niimlabel.py`.
+- `ptouch-bridge`: a Brother P-touch behind a small `ptouch-print` HTTP bridge (`GET /health`, `POST /print`).
+
+Directly attached QL printers without a bridge are still the job of
 [`label-printer-plugin`](https://github.com/danielrosehill/label-printer-plugin).
 
 ## Requirements

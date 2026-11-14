@@ -53,7 +53,11 @@ and `install`. It's machine-local and never committed.
 |---|---|
 | `id` | Key used by every subcommand. `-p`/`status` also accept `cups_queue` |
 | `site` | Free text: `home`, `office`, … `tidy-queues` uses it to keep other sites' queues |
-| `kind` | `document` or `label`. Label printers are out of scope |
+| `kind` | `document` or `label`. `label` entries are printed by `labelctl.py` (see below) |
+| `driver` | label only: `niimblue` or `ptouch-bridge` |
+| `bridge` | label only: base URL of the print bridge, e.g. `http://host:9181` |
+| `client` | `niimblue` only: absolute path to the niimbot-labels plugin's `niimlabel.py` |
+| `default` | label only: `true` on the label printer `labelctl.py print` uses without `-p` |
 | `profile` | `null` if the IPP probe failed at registration. Refresh with `probe <id>` |
 | `profile.markers` | A snapshot from registration time. Use `status` for live levels |
 | `cups_queue` / `installed_on` | Set by `install`. Queues added on other hosts aren't tracked automatically |
