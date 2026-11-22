@@ -77,6 +77,26 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/printctl.py" print in.pdf -p <queue> --ps
 
 If the site notes say the server has this fault, use `--ps` from the start.
 
+### PostScript fails too: bypass the print server
+
+Seen 2026-11-22: the print hub job and a `--ps` job both ended `total 0` with the same `Missing Root object` /
+`gstoraster filter failed` lines, because the client queue forwarded the PostScript to the server, which turned it back
+into PDF. When the client is on the printer's LAN, skip the server and print straight to the printer through a local
+driverless queue. The client's own CUPS filters do the conversion, and that worked first time.
+
+```bash
+# once per machine: a direct IPP Everywhere queue to the printer itself (address from the registry / site notes)
+sudo lpadmin -p <queue>-direct -E -v ipp://<printer-ip>:631/ipp/print -m everywhere
+lp -d <queue>-direct -o media=A4 in.pdf
+```
+
+- Don't hand-rasterise and push with `ipptool`: a Ghostscript `pwgraster` file was refused with
+  `client-error-document-format-error`, and the failed job left the printer in `processing` /
+  `spool-area-full-report` until it was cancelled (`ipptool -d job-id=N ipp://<printer-ip>:631/ipp/print cancel-job.test`).
+- While a direct job prints, the printer reports `processing` + `spool-area-full-report`. That's normal; it isn't stuck.
+- There is no server `page_log` entry for a direct job. Check `lpstat -W completed -o <queue>-direct`, or ask the user.
+- Away from home (tailnet only), the direct queue can't reach the printer: fall back to the hub and the steps above.
+
 For a landscape page do not add `-o landscape`: the page is already landscape, and the option rotates it a second time.
 Confirm it printed from the server's `page_log` (`total 1`, not `total 0`), not from the client queue emptying.
 
