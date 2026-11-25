@@ -57,6 +57,22 @@ The hub scales text to the full tape height, so a short single line comes out hu
 - **Group copies in one job** (`-n 2`): each job also feeds about 25 mm of lead tape (`tapeUsedMm` minus `labelMm`, 2026-11-25).
 - A user who asks for a big label gets one.
 
+## Resume after the tape runs out (or a jam)
+
+The job is recorded before it is sent, so nothing has to be retyped. Do not resend the whole batch.
+
+1. Ask the user for the first label that is **missing or unusable** (and which copy, if some copies of it came out). The bridge may
+   report success for a job whose tape ran out, and a call that errored or was interrupted may still have printed: the strip in the
+   user's hand decides.
+2. Wait until the user says the new cartridge is in. A reported tape width does not prove the refill: an empty cassette still has one.
+   If the new tape has another width, ask, then pass `--tape`.
+3. `tape_batch.py --list` shows the recorded job. Preview the rest, read the PNG, then run it without `--preview`:
+   `tape_batch.py --resume-from "USB-C 240W" [--copy 2] --preview /tmp/p.png`. A partly printed, unusable label is reprinted from
+   its own copy number, so it counts as not printed.
+4. The resumed part becomes the recorded job, so a second run-out resumes the same way.
+
+A job sent before recording existed, or through another tool: `tape_batch.py --record-only 'A::2' 'B::1' ...`, then step 1.
+
 ## Options
 
 `-i` Iconify id (`prefix:name`, bare name = `material-symbols:`). `--opt k=v` passes any hub label field, e.g.
