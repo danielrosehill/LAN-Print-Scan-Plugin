@@ -37,6 +37,19 @@ Hub URL: `$PRINT_HUB`, else `hub.json` in the plugin data dir (`{"print_hub": "h
 1. `--preview /tmp/p.png`, then Read the PNG. Thin outline icons print faintly: prefer filled icons, or drop the icon.
 2. Same command without `--preview`. 3. Report the job `state` (`done` / `failed` + `error`).
 
+## Tape economy (continuous tape)
+
+The hub scales text to the full tape height, so a short single line comes out huge: on 24 mm tape "Grade A" is
+82 mm long, against 31 mm as `Grade\nA`. Before every tape print:
+
+- **Read `size_px` from the preview**: length in mm = width px / 180 * 25.4 (180 dpi P-touch). Aim for about 45 mm or less for a
+  short label; over 60 mm needs a reason (long text, a cable flag).
+- **Break short text over two lines** with `\n`, balancing the lines. Compare the one- and two-line previews and print the shorter one.
+- **Text that should stay on one line**: render a PNG at the tape's full pixel height (`health.maxPx`) with the text at a smaller
+  size, centred vertically, and print it with `--png`. A 60 px font puts "Grade A" in about 32 mm.
+- **Group copies in one job** (`-n 2`): each job also feeds about 25 mm of lead tape (`tapeUsedMm` minus `labelMm`, 2026-11-25).
+- A user who asks for a big label gets one.
+
 ## Options
 
 `-i` Iconify id (`prefix:name`, bare name = `material-symbols:`). `--opt k=v` passes any hub label field, e.g.
