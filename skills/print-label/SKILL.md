@@ -47,6 +47,13 @@ The hub scales text to the full tape height, so a short single line comes out hu
 - **Break short text over two lines** with `\n`, balancing the lines. Compare the one- and two-line previews and print the shorter one.
 - **Text that should stay on one line**: render a PNG at the tape's full pixel height (`health.maxPx`) with the text at a smaller
   size, centred vertically, and print it with `--png`. A 60 px font puts "Grade A" in about 32 mm.
+- **Batch by default.** Two or more labels, even different ones, go out as one job:
+  `uv run -q --script "${CLAUDE_PLUGIN_ROOT}/scripts/tape_batch.py" 'Grade A::2' 'Grade B::2' 'Lavaliers\n3.5 mm::2'` (`text::copies`; run with
+  `--preview /tmp/p.png` first and read it). It goes straight to the P-touch bridge's `/print-batch`, sets a heading line over smaller
+  lines, and keeps each label within `--max-mm 45`. Collect the labels of one request, and any that arrive while a job is being
+  prepared, before printing. It does not appear in the hub's job list.
+- **Tape width:** the script expects 24 mm and stops if another is loaded. On narrower tape (12 mm is about 70 px): one line, no
+  icon, shortest wording, and follow the user's own instructions for it (`--tape 12`).
 - **Group copies in one job** (`-n 2`): each job also feeds about 25 mm of lead tape (`tapeUsedMm` minus `labelMm`, 2026-11-25).
 - A user who asks for a big label gets one.
 
